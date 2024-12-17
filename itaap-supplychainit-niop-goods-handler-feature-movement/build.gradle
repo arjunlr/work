@@ -1,0 +1,27 @@
+plugins {
+    id 'com.philips.itaap.build-dependencies' version "${itaapMsComVersion}"
+    id 'com.philips.itaap.common-build-scripts' version "${itaapMsComVersion}"
+    id 'com.philips.itaap.dependency-versions' version "${itaapMsComVersion}"
+    id 'com.philips.itaap.ms-dependencies' version "${itaapMsComVersion}"
+}
+
+group 'com.philips.itaap'
+version '1.0.0'
+
+springBoot {
+    mainClass.set('com.philips.itaap.supplychainit.ngh.SpringBootApp')
+}
+
+dependencies {
+    implementation group: 'com.philips.itaap', name: 'itaap-ms-dev-base', version: "${itaapMsDevBaseVersion}"
+    //Itaap service base version
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-security'
+    implementation group: 'org.slf4j', name: 'slf4j-ext'
+    implementation group: 'org.springframework.kafka', name: 'spring-kafka', version: '2.8.5'
+    implementation group: 'io.projectreactor.kafka', name: 'reactor-kafka', version: '1.3.11'
+    implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.1.0'
+    implementation group: 'com.bazaarvoice.jolt', name: 'jolt-core', version: '0.1.7'
+    implementation group: 'com.bazaarvoice.jolt', name: 'json-utils', version: '0.1.7'
+    //audit-client
+    implementation group: 'com.philips.itaap', name: 'itaap-audit-client'
+}

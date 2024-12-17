@@ -1,0 +1,95 @@
+spring:
+  application:
+    name: itaap-supplychainit-niop-goods-handler
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_SASL_SCRAM_BOOTSTRAPSERVERS}
+    consumer:
+      max-poll-records: ${KAFKA_MAX_POLL_RECORDS}
+      concurrency: ${KAFKA_CONCURRENCY}
+      group-id: ${KAFKA_GROUP_ID}
+      properties:
+        max:
+          poll:
+            interval:
+              ms: ${KAFKA_MAX_POLL_INTERVAL}
+        spring:
+          json:
+            use:
+              type:
+                headers: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: ${KAFKA_ACK_MODE}
+    enable:
+      auto:
+        commit: false
+
+app:
+  env: ${APP_ENV:cloud}
+  version: ${APP_VERSION:1.0.0}
+
+server:
+  port: 8080
+
+api:
+  niop-goods-handler: ${NIOP_GOODS_HANDLER_URL}
+
+#Kafka Configuration
+kafka:
+  topic:
+    read: ${KAFKA_TOPIC_READ}
+  consumer:
+    concurrency: ${KAFKA_CONCURRENCY}
+
+webclient:
+  connection:
+    timeout: ${WEBCLIENT_CONNECTION_TIMEOUT}
+  memory-buffer-size: ${WEBCLIENT_IN_MEMORY_SIZE}
+  retry:
+    maxretry: ${WEBCLIENT_ATTEMPT}
+    delay: ${WEBCLIENT_ATTEMPT_DELAY}
+  response:
+    timeout: ${WEBCLIENT_TIMEOUT}
+
+#Audit Configuration 
+audit:
+  connector:
+    url: ${AUDIT_CONNECTOR_URL}
+    username: ${AUDIT_CONNECTOR_USERNAME}
+    password: ${AUDIT_CONNECTOR_PASSWORD}
+
+niop:
+  token:
+    url: ${NIOP_TOKEN_URL}
+    creds:
+      username: ${NIOP_USERNAME}
+      password: ${NIOP_PASSWORD}
+  reciept-url: ${NIOP_GOODS_RECIEPT_URL}
+
+good-movement:
+  token:
+    url: ${GOODS_HANDLER_TOKEN_URL}
+    creds:
+      grant-type: ${GOODS_HANDLER_GRANT_TYPE}
+      client-id: ${GOODS_HANDLER_CLIENT_ID}
+      client-secret: ${GOODS_HANDLER_CLIENT_SECRET}
+      scope: ${GOODS_HANDLER_SCOPE}
+  movement-url: ${GOODS_HANDLER_APIGEE_URL}
+
+#service logging level
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT}
+    com:
+      philips:
+        itaap: ${LOG_LEVEL_SERVICE}
+
+email:
+  url: ${EMAIL_URL}
+  username: ${EMAIL_USERNAME}
+  password: ${EMAIL_PASSWORD}
+  to: ${EMAIL_TO}
+  cc: ${EMAIL_CC}
+  subject: ${EMAIL_SUBJECT}
+  body: ${EMAIL_BODY}

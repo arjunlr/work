@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: itaap-supplychainit-niop-goods-handler-cm
+  namespace: {{deployNamespace}}
+data:
+  KAFKA_MAX_POLL_RECORDS: "{{kafkaMaxPollRecords}}"
+  KAFKA_CONCURRENCY: "{{kafkaConcurrency}}"
+  KAFKA_GROUP_ID: "{{kafkaGroupId}}"
+  KAFKA_MAX_POLL_INTERVAL: "{{kafkaMaxPollInterval}}"
+  KAFKA_ACK_MODE: "{{kafkaAckMode}}"
+  KAFKA_TOPIC_READ: "{{topicRead}}"
+  WEBCLIENT_ATTEMPT: "{{webClientMaxRetry}}"
+  WEBCLIENT_ATTEMPT_DELAY: "{{webClientDelay}}"
+  WEBCLIENT_TIMEOUT: "{{webClientTimeout}}"
+  WEBCLIENT_IN_MEMORY_SIZE: "{{webClientMemoryBuffer}}"
+  WEBCLIENT_CONNECTION_TIMEOUT: "{{webClientConnectionTimeout}}"
+  NIOP_TOKEN_URL: "{{niopTokenUrl}}"
+  NIOP_USERNAME: "{{niopUsername}}"
+  NIOP_PASSWORD: "{{niopPassword}}"
+  NIOP_GOODS_RECIEPT_URL: "{{niopGoodsReceiptUrl}}"
+  GOODS_HANDLER_TOKEN_URL: "{{goodsHandlerTokenUrl}}"
+  GOODS_HANDLER_GRANT_TYPE: "{{goodsHandlerGrantType}}"
+  GOODS_HANDLER_CLIENT_ID: "{{goodsHandlerClientId}}"
+  GOODS_HANDLER_SCOPE: "{{goodsHandlerScope}}"
+  GOODS_HANDLER_APIGEE_URL: "{{goodsHandlerApigeeUrl}}"
+  LOG_LEVEL_ROOT: "{{rootLogLevel}}"
+  LOG_LEVEL_SERVICE: "{{serviceLogLevel}}"
+  EMAIL_URL: "{{emailUrl}}"
+  EMAIL_TO: "{{emailTo}}"
+  EMAIL_CC: "{{emailCc}}"
+  EMAIL_SUBJECT: "{{emailSubject}}"
+  EMAIL_BODY: "{{emailBody}}"
+  NIOP_GOODS_HANDLER_URL: "{{niopGoodsHandlerUrl}}"
+

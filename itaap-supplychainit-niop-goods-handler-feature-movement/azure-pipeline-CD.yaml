@@ -1,0 +1,181 @@
+variables:
+  - name: V_TEST_SUITE_NAME
+    value: 'postman_collection/collection/postman_collection.json'
+  - name: V_TEST_SUITE_ENV_NAME
+    value: 'postman_collection/env/DEV.postman_environment.json'
+  - name: V_BROWSER_TITLE
+    value: 'itaap-supplychainit-niop-goods-handler MicroService Report'
+  - name: V_TITLE
+    value: 'itaap-supplychainit-niop-goods-handler MicroService DASHBOARD'
+  - name: Version.MajorMinor
+    value: 1.0
+  - name: Version.Revision
+    value: $[counter(variables['Version.MajorMinor'], 0)]
+  - group: AWS_Credentials
+  - group: AWS_Credentials_Acc
+  - group: AWS_Credentials_Prod
+
+name: $(Version.MajorMinor).$(Version.Revision)
+
+# To restrict pipeline trigger from pushes to any branch
+trigger: none
+
+# To restrict pipeline trigger from pull request form or to any branch
+pr: none
+
+resources:
+  pipelines:
+    - pipeline: itaap-supplychainit-niop-goods-handler-pipeline
+      source: "itaap-supplychainit-niop-goods-handler"
+      branch: main
+      trigger:
+        branches:
+          - main
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: dev
+    displayName: itaap-supplychainit-niop-goods-handler MicroService Dev deployment
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: dev
+        variables:
+          - group: AWS_Credentials
+          - group: DEV_SUPPLYCHAINIT_NIOP_GOODS_HANDLER
+        environment: environment-itaap-apps-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: Bash@3
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      export AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID)
+                      export AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY)
+                      aws eks --region eu-west-1 update-kubeconfig --name itaap-non-prod
+                      imageTagName=$(resources.pipeline.itaap-supplychainit-niop-goods-handler-pipeline.runName)
+                      echo "Image tag " $imageTagName
+                      template=`cat eks-deployment.yaml | sed "s/{{imageTagName}}/$imageTagName/g" | sed "s/{{deployNamespace}}/itaap-non-prod-supplychainit-dev/g" | sed "s/{{appEnv}}/dev/g" | sed "s/{{appVersion}}/$imageTagName/g" | sed "s/{{envIdentifier}}/$(ENV_IDENTIFIER)/g" | sed "s/{{host}}/dev.apps.api.it.philips.com/g" | sed "s/{{env}}/non-prod/g"`
+                      configMapTemplate=`cat eks-config-maps.yaml | sed "s/{{deployNamespace}}/itaap-non-prod-supplychainit-dev/g" | sed "s/{{kafkaMaxPollRecords}}/$(KAFKA_MAX_POLL_RECORDS)/g" | sed "s/{{kafkaConcurrency}}/$(KAFKA_CONCURRENCY)/g" | sed "s/{{kafkaGroupId}}/$(KAFKA_GROUP_ID)/g" | sed "s/{{kafkaMaxPollInterval}}/$(KAFKA_MAX_POLL_INTERVAL)/g" | sed "s/{{kafkaAckMode}}/$(KAFKA_ACK_MODE)/g" | sed "s/{{topicRead}}/$(KAFKA_TOPIC_READ)/g" | sed "s/{{webClientMaxRetry}}/$(WEBCLIENT_ATTEMPT)/g" | sed "s/{{webClientDelay}}/$(WEBCLIENT_ATTEMPT_DELAY)/g" | sed "s/{{webClientTimeout}}/$(WEBCLIENT_TIMEOUT)/g" | sed "s/{{webClientMemoryBuffer}}/$(WEBCLIENT_IN_MEMORY_SIZE)/g" | sed "s/{{webClientConnectionTimeout}}/$(WEBCLIENT_CONNECTION_TIMEOUT)/g" | sed "s/{{niopTokenUrl}}/$(NIOP_TOKEN_URL)/g" | sed "s/{{niopUsername}}/$(NIOP_USERNAME)/g" | sed "s/{{niopPassword}}/$(NIOP_PASSWORD)/g" | sed "s/{{niopGoodsReceiptUrl}}/$(NIOP_GOODS_RECIEPT_URL)/g" | sed "s/{{goodsHandlerTokenUrl}}/$(GOODS_HANDLER_TOKEN_URL)/g" | sed "s/{{goodsHandlerGrantType}}/$(GOODS_HANDLER_GRANT_TYPE)/g" | sed "s/{{goodsHandlerClientId}}/$(GOODS_HANDLER_CLIENT_ID)/g" | sed "s/{{goodsHandlerScope}}/$(GOODS_HANDLER_SCOPE)/g" | sed "s/{{goodsHandlerApigeeUrl}}/$(GOODS_HANDLER_APIGEE_URL)/g" | sed "s/{{rootLogLevel}}/$(LOG_LEVEL_ROOT)/g" | sed "s/{{serviceLogLevel}}/$(LOG_LEVEL_SERVICE)/g" | sed "s/{{emailUrl}}/$(EMAIL_URL)/g" | sed "s/{{emailTo}}/$(EMAIL_TO)/g" | sed "s/{{emailCc}}/$(EMAIL_CC)/g" | sed "s/{{emailSubject}}/$(EMAIL_SUBJECT)/g" | sed "s/{{emailBody}}/$(EMAIL_BODY)/g" | sed "s/{{niopGoodsHandlerUrl}}/$(NIOP_GOODS_HANDLER_URL)/g"`
+                      secretMapTemplate=`cat eks-config-secrets.yaml | sed "s/{{deployNamespace}}/itaap-non-prod-supplychainit-dev/g" | sed "s/{{mskUsername}}/$(MSK_USER_NAME)/g" | sed "s/{{mskPassword}}/$(MSK_PASSWORD)/g" | sed "s/{{goodsHandlerClientSecret}}/$(GOODS_HANDLER_CLIENT_SECRET)/g" | sed "s/{{emailUsername}}/$(EMAIL_USERNAME)/g" | sed "s/{{emailPassword}}/$(EMAIL_PASSWORD)/g"`
+                      echo "$secretMapTemplate" | kubectl apply -f -
+                      echo "$configMapTemplate" | kubectl apply -f -
+                      echo "$template" | kubectl apply -f -
+
+  - stage: validation_post_deployment_on_dev
+    displayName: 'validation_post_deployment_on_dev'
+    dependsOn: dev
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: validation_post_deployment
+        variables:
+          - group: environment-itaap-dev
+          - group: AWS_Credentials
+        environment: environment-itaap-apps-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - template: newman-report-template.yaml
+                  parameters:
+                    P_TEST_SUITE_NAME: ${{ variables.V_TEST_SUITE_NAME }}
+                    P_TEST_SUITE_ENV_NAME: ${{ variables.V_TEST_SUITE_ENV_NAME }}
+                    P_BROWSER_TITLE: ${{ variables.V_BROWSER_TITLE }}
+                    P_TITLE: ${{ variables.V_TITLE }}
+
+  - stage: test
+    displayName: itaap-supplychainit-niop-goods-handler MicroService Test deployment
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    dependsOn: validation_post_deployment_on_dev
+    jobs:
+      - deployment: test
+        variables:
+          - group: AWS_Credentials
+          - group: TEST_SUPPLYCHAINIT_NIOP_GOODS_HANDLER
+        environment: environment-itaap-apps-test
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: Bash@3
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      export AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID)
+                      export AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY)
+                      aws eks --region eu-west-1 update-kubeconfig --name itaap-non-prod
+                      imageTagName=$(resources.pipeline.itaap-supplychainit-niop-goods-handler-pipeline.runName)
+                      echo "Image tag " $imageTagName
+                      template=`cat eks-deployment.yaml | sed "s/{{imageTagName}}/$imageTagName/g" | sed "s/{{deployNamespace}}/itaap-non-prod-supplychainit-test/g" | sed "s/{{appEnv}}/tst/g" | sed "s/{{appVersion}}/$imageTagName/g" | sed "s/{{envIdentifier}}/$(ENV_IDENTIFIER)/g" | sed "s/{{host}}/dev.apps.api.it.philips.com/g" | sed "s/{{env}}/non-prod/g"`
+                      configMapTemplate=`cat eks-config-maps.yaml | sed "s/{{deployNamespace}}/itaap-non-prod-supplychainit-test/g" | sed "s/{{kafkaMaxPollRecords}}/$(KAFKA_MAX_POLL_RECORDS)/g" | sed "s/{{kafkaConcurrency}}/$(KAFKA_CONCURRENCY)/g" | sed "s/{{kafkaGroupId}}/$(KAFKA_GROUP_ID)/g" | sed "s/{{kafkaMaxPollInterval}}/$(KAFKA_MAX_POLL_INTERVAL)/g" | sed "s/{{kafkaAckMode}}/$(KAFKA_ACK_MODE)/g" | sed "s/{{topicRead}}/$(KAFKA_TOPIC_READ)/g" | sed "s/{{webClientMaxRetry}}/$(WEBCLIENT_ATTEMPT)/g" | sed "s/{{webClientDelay}}/$(WEBCLIENT_ATTEMPT_DELAY)/g" | sed "s/{{webClientTimeout}}/$(WEBCLIENT_TIMEOUT)/g" | sed "s/{{webClientMemoryBuffer}}/$(WEBCLIENT_IN_MEMORY_SIZE)/g" | sed "s/{{webClientConnectionTimeout}}/$(WEBCLIENT_CONNECTION_TIMEOUT)/g" | sed "s/{{niopTokenUrl}}/$(NIOP_TOKEN_URL)/g" | sed "s/{{niopUsername}}/$(NIOP_USERNAME)/g" | sed "s/{{niopPassword}}/$(NIOP_PASSWORD)/g" | sed "s/{{niopGoodsReceiptUrl}}/$(NIOP_GOODS_RECIEPT_URL)/g" | sed "s/{{goodsHandlerTokenUrl}}/$(GOODS_HANDLER_TOKEN_URL)/g" | sed "s/{{goodsHandlerGrantType}}/$(GOODS_HANDLER_GRANT_TYPE)/g" | sed "s/{{goodsHandlerClientId}}/$(GOODS_HANDLER_CLIENT_ID)/g" | sed "s/{{goodsHandlerScope}}/$(GOODS_HANDLER_SCOPE)/g" | sed "s/{{goodsHandlerApigeeUrl}}/$(GOODS_HANDLER_APIGEE_URL)/g" | sed "s/{{rootLogLevel}}/$(LOG_LEVEL_ROOT)/g" | sed "s/{{serviceLogLevel}}/$(LOG_LEVEL_SERVICE)/g" | sed "s/{{emailUrl}}/$(EMAIL_URL)/g" | sed "s/{{emailTo}}/$(EMAIL_TO)/g" | sed "s/{{emailCc}}/$(EMAIL_CC)/g" | sed "s/{{emailSubject}}/$(EMAIL_SUBJECT)/g" | sed "s/{{emailBody}}/$(EMAIL_BODY)/g" | sed "s/{{niopGoodsHandlerUrl}}/$(NIOP_GOODS_HANDLER_URL)/g"`
+                      secretMapTemplate=`cat eks-config-secrets.yaml | sed "s/{{deployNamespace}}/itaap-non-prod-supplychainit-test/g" | sed "s/{{mskUsername}}/$(MSK_USER_NAME)/g" | sed "s/{{mskPassword}}/$(MSK_PASSWORD)/g" | sed "s/{{goodsHandlerClientSecret}}/$(GOODS_HANDLER_CLIENT_SECRET)/g" | sed "s/{{emailUsername}}/$(EMAIL_USERNAME)/g" | sed "s/{{emailPassword}}/$(EMAIL_PASSWORD)/g"`
+                      echo "$secretMapTemplate" | kubectl apply -f -
+                      echo "$configMapTemplate" | kubectl apply -f -
+                      echo "$template" | kubectl apply -f -
+
+  - stage: acc
+    displayName: itaap-supplychainit-niop-goods-handler MicroService Acc deployment
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    dependsOn: test
+    jobs:
+      - deployment: acc
+        variables:
+          - group: AWS_Credentials_Acc
+          - group: ACC_SUPPLYCHAINIT_NIOP_GOODS_HANDLER
+        environment: environment-itaap-apps-acc
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: Bash@3
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      export AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID)
+                      export AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY)
+                      aws eks --region eu-west-1 update-kubeconfig --name itaap-acc
+                      imageTagName=$(resources.pipeline.itaap-supplychainit-niop-goods-handler-pipeline.runName)
+                      echo "Image tag " $imageTagName
+                      template=`cat eks-deployment.yaml | sed "s/{{imageTagName}}/$imageTagName/g" | sed "s/{{deployNamespace}}/itaap-acc-supplychainit/g" | sed "s/{{appEnv}}/acc/g" | sed "s/{{appVersion}}/$imageTagName/g" | sed "s/{{envIdentifier}}/$(ENV_IDENTIFIER)/g" | sed "s/{{host}}/acc.apps.api.it.philips.com/g" | sed "s/{{env}}/acc/g"`
+                      configMapTemplate=`cat eks-config-maps.yaml | sed "s/{{deployNamespace}}/itaap-acc-supplychainit/g" | sed "s/{{kafkaMaxPollRecords}}/$(KAFKA_MAX_POLL_RECORDS)/g" | sed "s/{{kafkaConcurrency}}/$(KAFKA_CONCURRENCY)/g" | sed "s/{{kafkaGroupId}}/$(KAFKA_GROUP_ID)/g" | sed "s/{{kafkaMaxPollInterval}}/$(KAFKA_MAX_POLL_INTERVAL)/g" | sed "s/{{kafkaAckMode}}/$(KAFKA_ACK_MODE)/g" | sed "s/{{topicRead}}/$(KAFKA_TOPIC_READ)/g" | sed "s/{{webClientMaxRetry}}/$(WEBCLIENT_ATTEMPT)/g" | sed "s/{{webClientDelay}}/$(WEBCLIENT_ATTEMPT_DELAY)/g" | sed "s/{{webClientTimeout}}/$(WEBCLIENT_TIMEOUT)/g" | sed "s/{{webClientMemoryBuffer}}/$(WEBCLIENT_IN_MEMORY_SIZE)/g" | sed "s/{{webClientConnectionTimeout}}/$(WEBCLIENT_CONNECTION_TIMEOUT)/g" | sed "s/{{niopTokenUrl}}/$(NIOP_TOKEN_URL)/g" | sed "s/{{niopUsername}}/$(NIOP_USERNAME)/g" | sed "s/{{niopPassword}}/$(NIOP_PASSWORD)/g" | sed "s/{{niopGoodsReceiptUrl}}/$(NIOP_GOODS_RECIEPT_URL)/g" | sed "s/{{goodsHandlerTokenUrl}}/$(GOODS_HANDLER_TOKEN_URL)/g" | sed "s/{{goodsHandlerGrantType}}/$(GOODS_HANDLER_GRANT_TYPE)/g" | sed "s/{{goodsHandlerClientId}}/$(GOODS_HANDLER_CLIENT_ID)/g" | sed "s/{{goodsHandlerScope}}/$(GOODS_HANDLER_SCOPE)/g" | sed "s/{{goodsHandlerApigeeUrl}}/$(GOODS_HANDLER_APIGEE_URL)/g" | sed "s/{{rootLogLevel}}/$(LOG_LEVEL_ROOT)/g" | sed "s/{{serviceLogLevel}}/$(LOG_LEVEL_SERVICE)/g" | sed "s/{{emailUrl}}/$(EMAIL_URL)/g" | sed "s/{{emailTo}}/$(EMAIL_TO)/g" | sed "s/{{emailCc}}/$(EMAIL_CC)/g" | sed "s/{{emailSubject}}/$(EMAIL_SUBJECT)/g" | sed "s/{{emailBody}}/$(EMAIL_BODY)/g" | sed "s/{{niopGoodsHandlerUrl}}/$(NIOP_GOODS_HANDLER_URL)/g"`
+                      secretMapTemplate=`cat eks-config-secrets.yaml | sed "s/{{deployNamespace}}/itaap-acc-supplychainit/g" | sed "s/{{mskUsername}}/$(MSK_USER_NAME)/g" | sed "s/{{mskPassword}}/$(MSK_PASSWORD)/g" | sed "s/{{goodsHandlerClientSecret}}/$(GOODS_HANDLER_CLIENT_SECRET)/g" | sed "s/{{emailUsername}}/$(EMAIL_USERNAME)/g" | sed "s/{{emailPassword}}/$(EMAIL_PASSWORD)/g"`
+                      echo "$secretMapTemplate" | kubectl apply -f -
+                      echo "$configMapTemplate" | kubectl apply -f -  
+                      echo "$template" | kubectl apply -f -                            
+
+  - stage: prod
+    displayName: itaap-supplychainit-niop-goods-handler MicroService Production deployment
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    dependsOn: acc
+    jobs:
+      - deployment: production
+        variables:
+          - group: AWS_Credentials_Prod
+          - group: PROD_SUPPLYCHAINIT_NIOP_GOODS_HANDLER
+        environment: environment-itaap-apps-prod
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: Bash@3
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      export AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID)
+                      export AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY)
+                      aws eks --region eu-west-1 update-kubeconfig --name itaap-prod
+                      imageTagName=$(resources.pipeline.itaap-supplychainit-niop-goods-handler-pipeline.runName)
+                      echo "Image tag " $imageTagName
+                      template=`cat eks-deployment.yaml | sed "s/{{imageTagName}}/$imageTagName/g" | sed "s/{{deployNamespace}}/itaap-prod-supplychainit/g" | sed "s/{{appEnv}}/prod/g" | sed "s/{{appVersion}}/$imageTagName/g" | sed "s/{{envIdentifier}}/$(ENV_IDENTIFIER)/g" | sed "s/{{host}}/apps.api.it.philips.com/g" | sed "s/{{env}}/prod/g"`
+                      configMapTemplate=`cat eks-config-maps.yaml | sed "s/{{deployNamespace}}/itaap-prod-supplychainit/g" | sed "s/{{kafkaMaxPollRecords}}/$(KAFKA_MAX_POLL_RECORDS)/g" | sed "s/{{kafkaConcurrency}}/$(KAFKA_CONCURRENCY)/g" | sed "s/{{kafkaGroupId}}/$(KAFKA_GROUP_ID)/g" | sed "s/{{kafkaMaxPollInterval}}/$(KAFKA_MAX_POLL_INTERVAL)/g" | sed "s/{{kafkaAckMode}}/$(KAFKA_ACK_MODE)/g" | sed "s/{{topicRead}}/$(KAFKA_TOPIC_READ)/g" | sed "s/{{webClientMaxRetry}}/$(WEBCLIENT_ATTEMPT)/g" | sed "s/{{webClientDelay}}/$(WEBCLIENT_ATTEMPT_DELAY)/g" | sed "s/{{webClientTimeout}}/$(WEBCLIENT_TIMEOUT)/g" | sed "s/{{webClientMemoryBuffer}}/$(WEBCLIENT_IN_MEMORY_SIZE)/g" | sed "s/{{webClientConnectionTimeout}}/$(WEBCLIENT_CONNECTION_TIMEOUT)/g" | sed "s/{{niopTokenUrl}}/$(NIOP_TOKEN_URL)/g" | sed "s/{{niopUsername}}/$(NIOP_USERNAME)/g" | sed "s/{{niopPassword}}/$(NIOP_PASSWORD)/g" | sed "s/{{niopGoodsReceiptUrl}}/$(NIOP_GOODS_RECIEPT_URL)/g" | sed "s/{{goodsHandlerTokenUrl}}/$(GOODS_HANDLER_TOKEN_URL)/g" | sed "s/{{goodsHandlerGrantType}}/$(GOODS_HANDLER_GRANT_TYPE)/g" | sed "s/{{goodsHandlerClientId}}/$(GOODS_HANDLER_CLIENT_ID)/g" | sed "s/{{goodsHandlerScope}}/$(GOODS_HANDLER_SCOPE)/g" | sed "s/{{goodsHandlerApigeeUrl}}/$(GOODS_HANDLER_APIGEE_URL)/g" | sed "s/{{rootLogLevel}}/$(LOG_LEVEL_ROOT)/g" | sed "s/{{serviceLogLevel}}/$(LOG_LEVEL_SERVICE)/g" | sed "s/{{emailUrl}}/$(EMAIL_URL)/g" | sed "s/{{emailTo}}/$(EMAIL_TO)/g" | sed "s/{{emailCc}}/$(EMAIL_CC)/g" | sed "s/{{emailSubject}}/$(EMAIL_SUBJECT)/g" | sed "s/{{emailBody}}/$(EMAIL_BODY)/g" | sed "s/{{niopGoodsHandlerUrl}}/$(NIOP_GOODS_HANDLER_URL)/g"`
+                      secretMapTemplate=`cat eks-config-secrets.yaml | sed "s/{{deployNamespace}}/itaap-prod-supplychainit/g" | sed "s/{{mskUsername}}/$(MSK_USER_NAME)/g" | sed "s/{{mskPassword}}/$(MSK_PASSWORD)/g" | sed "s/{{goodsHandlerClientSecret}}/$(GOODS_HANDLER_CLIENT_SECRET)/g" | sed "s/{{emailUsername}}/$(EMAIL_USERNAME)/g" | sed "s/{{emailPassword}}/$(EMAIL_PASSWORD)/g"`
+                      echo "$secretMapTemplate" | kubectl apply -f -
+                      echo "$configMapTemplate" | kubectl apply -f -     
+                      echo "$template" | kubectl apply -f -                 

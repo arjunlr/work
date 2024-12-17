@@ -1,0 +1,165 @@
+<html>
+<head>
+    <title>GoodmovementService.java</title>
+    <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+    <style type="text/css">
+        .s0 { color: #0033b3;}
+        .s1 { color: #080808;}
+        .s2 { color: #067d17;}
+        .s3 { color: #8c8c8c; font-style: italic;}
+        .s4 { color: #8c8c8c; font-style: italic;}
+        .s5 { color: #1750eb;}
+    </style>
+</head>
+<body bgcolor="#ffffff">
+<table BGCOLOR="#c0c0c0" CELLPADDING=5 CELLSPACING=0 COLS=1 WIDTH="100%">
+    <tr>
+        <td>
+            <center>
+                <font color="#000000" face="Arial, Helvetica">
+                    GoodmovementService.java</font>
+            </center>
+        </td>
+    </tr>
+</table>
+<pre><span class="s0">package </span><span class="s1">com.philips.itaap.supplychainit.ngh.service;</span>
+
+<span class="s0">import </span><span class="s1">com.bazaarvoice.jolt.JsonUtils;</span>
+<span class="s0">import </span><span class="s1">com.philips.itaap.supplychainit.ngh.config.ApplicationProperties;</span>
+<span class="s0">import </span><span
+            class="s1">com.philips.itaap.supplychainit.ngh.model.movement.GoodsMovementRequest;</span>
+<span class="s0">import </span><span class="s1">com.philips.itaap.supplychainit.ngh.model.movement.OutputPayload;</span>
+<span class="s0">import </span><span class="s1">com.philips.itaap.supplychainit.ngh.model.movement.inputpayload.GoodsMovementItems;</span>
+<span class="s0">import </span><span class="s1">com.philips.itaap.supplychainit.ngh.model.movement.inputpayload.InputApiHeader;</span>
+<span class="s0">import </span><span class="s1">com.philips.itaap.supplychainit.ngh.model.movement.outputpayload.GoodsMovement;</span>
+<span class="s0">import </span><span class="s1">com.philips.itaap.supplychainit.ngh.model.movement.outputpayload.OutputApiHeader;</span>
+<span class="s0">import </span><span class="s1">com.philips.itaap.supplychainit.ngh.model.movement.outputpayload.SerialNumbers;</span>
+<span class="s0">import </span><span class="s1">lombok.extern.slf4j.XSlf4j;</span>
+<span class="s0">import </span><span class="s1">org.springframework.beans.factory.annotation.Autowired;</span>
+<span class="s0">import </span><span class="s1">org.springframework.stereotype.Service;</span>
+<span class="s0">import </span><span class="s1">reactor.core.publisher.Mono;</span>
+
+<span class="s0">import </span><span class="s1">java.util.List;</span>
+<span class="s0">import </span><span class="s1">java.util.stream.Collectors;</span>
+<span class="s0">import </span><span class="s1">java.util.stream.IntStream;</span>
+
+<span class="s1">@Service</span>
+<span class="s1">@XSlf4j</span>
+<span class="s1">@SuppressWarnings({</span><span class="s2">&quot;PMD-START&quot;</span><span class="s1">, </span><span
+            class="s2">&quot;CPD-START&quot;</span><span class="s1">})</span>
+<span class="s0">public class </span><span class="s1">GoodmovementService {</span>
+
+    <span class="s1">@Autowired</span>
+    <span class="s1">WebClientService webClientService;</span>
+
+    <span class="s1">@Autowired</span>
+    <span class="s1">ApplicationProperties properties;</span>
+
+    <span class="s3">/**</span>
+     <span class="s3">* This method is used for processing the message received from Kafka topic.</span>
+     <span class="s3">*</span>
+     <span class="s3">* </span><span class="s4">@param </span><span
+            class="s3">input Consumed Message from kafka topic.</span>
+     <span class="s3">* </span><span class="s4">@return </span><span class="s3">Mono of OutputPayload</span>
+     <span class="s3">*/</span>
+    <span class="s0">public </span><span class="s1">Mono&lt;OutputPayload&gt; transformPayload(GoodsMovementRequest input) {</span>
+
+        <span class="s1">log.info(</span><span class="s2">&quot;GoodsMovementPayload: -&gt;{}&quot;</span><span
+            class="s1">, JsonUtils.toJsonString(input));</span>
+
+
+
+        <span class="s3">// Populate ApiHeader from InputPayload</span>
+        <span class="s1">OutputApiHeader apiHeader = </span><span class="s0">new </span><span class="s1">OutputApiHeader();</span>
+        <span class="s1">InputApiHeader inputApiHeader = input.getApiHeader();</span>
+        <span class="s1">apiHeader.setCorrelationId(inputApiHeader.getCorrelationId());</span>
+        <span class="s1">apiHeader.setRecordName(inputApiHeader.getRecordName());</span>
+        <span class="s1">apiHeader.setRecordId(inputApiHeader.getRecordId());</span>
+        <span class="s1">String deliveryPlant = input.getGoodsMovement().getGoodsMovementItems().get(</span><span
+            class="s5">0</span><span class="s1">).getDeliveryPlant();</span>
+        <span class="s0">switch </span><span class="s1">(deliveryPlant) {</span>
+            <span class="s0">case </span><span class="s2">&quot;USLX&quot;</span><span class="s1">:</span>
+                <span class="s1">apiHeader.setConsumer(</span><span class="s2">&quot;USLX&quot;</span><span class="s1">);</span>
+                <span class="s0">break</span><span class="s1">;</span>
+            <span class="s0">case </span><span class="s2">&quot;USPX&quot;</span><span class="s1">:</span>
+                <span class="s1">apiHeader.setConsumer(</span><span class="s2">&quot;USPX&quot;</span><span class="s1">);</span>
+                <span class="s0">break</span><span class="s1">;</span>
+            <span class="s0">default</span><span class="s1">:</span>
+                <span class="s1">log.error(</span><span class="s2">&quot;Invalid delivery plant: {}&quot;</span><span
+            class="s1">, deliveryPlant);</span>
+                <span class="s0">return </span><span class="s1">Mono.error(</span><span class="s0">new </span><span
+            class="s1">IllegalArgumentException(</span><span
+            class="s2">&quot;Invalid delivery plant: &quot; </span><span class="s1">+ deliveryPlant));</span>
+        <span class="s1">}</span>
+
+        <span class="s3">// Create OutputPayload instance</span>
+        <span class="s1">OutputPayload output = </span><span class="s0">new </span><span
+            class="s1">OutputPayload();</span>
+
+        <span class="s1">apiHeader.setProvider(inputApiHeader.getProvider());</span>
+        <span class="s1">apiHeader.setConsumerTimestamp(inputApiHeader.getConsumerTimestamp());</span>
+        <span class="s1">apiHeader.setTestMode(inputApiHeader.getTestMode());</span>
+        <span class="s1">apiHeader.setInfo1(inputApiHeader.getInfo1());</span>
+        <span class="s1">apiHeader.setInfo2(inputApiHeader.getInfo2());</span>
+        <span class="s1">apiHeader.setInfo3(inputApiHeader.getInfo3());</span>
+        <span class="s1">output.setApiHeader(apiHeader);</span>
+
+        <span class="s1">GoodsMovement goodsMovement = </span><span class="s0">new </span><span class="s1">GoodsMovement();</span>
+        <span class="s1">goodsMovement.setRefDocNumber(input.getGoodsMovement().getRefDocNumber());</span>
+        <span class="s1">goodsMovement.setDocDate(input.getGoodsMovement().getDocDate());</span>
+        <span class="s1">goodsMovement.setPostingDate(input.getGoodsMovement().getPostingDate());</span>
+        <span class="s1">goodsMovement.setHeaderText(input.getGoodsMovement().getHeaderText());</span>
+
+        <span class="s3">// Mapping GoodsMovementItems from input, based on quantity</span>
+ <span class="s0">int </span><span class="s1">quantity = Integer.parseInt(input.getGoodsMovement().getGoodsMovementItems().get(</span><span
+            class="s5">0</span><span class="s1">).getQuantity());</span>
+        <span class="s1">List&lt;GoodsMovementItems&gt;   goodsMovementItems = IntStream.range(</span><span
+            class="s5">0</span><span class="s1">, quantity)</span>
+                <span class="s1">.mapToObj(i -&gt; {</span>
+                   <span class="s1">GoodsMovementItems item = </span><span class="s0">new </span><span class="s1">GoodsMovementItems();</span>
+                    <span class="s1">item.setMaterialId(input.getGoodsMovement().getGoodsMovementItems().get(</span><span
+            class="s5">0</span><span class="s1">).getMaterialId());</span>
+                    <span class="s1">item.setDeliveryPlant(input.getGoodsMovement().getGoodsMovementItems().get(</span><span
+            class="s5">0</span><span class="s1">).getDeliveryPlant());</span>
+                    <span class="s1">item.setBatch(input.getGoodsMovement().getGoodsMovementItems().get(</span><span
+            class="s5">0</span><span class="s1">).getBatch());</span>
+                    <span class="s1">item.setQuantity(</span><span class="s2">&quot;1&quot;</span><span
+            class="s1">);</span>
+                    <span class="s1">item.setMovementType(input.getGoodsMovement().getGoodsMovementItems().get(</span><span
+            class="s5">0</span><span class="s1">).getMovementType());</span>
+                    <span class="s0">return </span><span class="s1">item;</span>
+                <span class="s1">})</span>
+                <span class="s1">.collect(Collectors.toList());</span>
+
+        <span class="s1">goodsMovement.setGoodsMovementItems(goodsMovementItems);</span>
+
+
+        <span class="s3">// Mapping SerialNumbers from input, based on quantity</span>
+        <span class="s1">List&lt;String&gt; serialNumbers = List.of(input.getGoodsMovement().getGoodsMovementItems().get(</span><span
+            class="s5">0</span><span class="s1">).getSerialNumberDetails().getSerialNumber().split(</span><span
+            class="s2">&quot;,&quot;</span><span class="s1">));</span>
+        <span class="s1">List&lt;SerialNumbers&gt; serialNumberList = IntStream.range(</span><span
+            class="s5">0</span><span class="s1">, quantity)</span>
+                <span class="s1">.mapToObj(i -&gt; {</span>
+                    <span class="s1">SerialNumbers serial = </span><span class="s0">new </span><span class="s1">SerialNumbers();</span>
+                    <span class="s1">serial.setSerialNumber(serialNumbers.get(i % serialNumbers.size())); </span><span
+            class="s3">// Cycle through serial numbers</span>
+                    <span class="s1">serial.setMaterialDocumentItem(String.format(</span><span class="s2">&quot;%04d&quot;</span><span
+            class="s1">, i + </span><span class="s5">1</span><span class="s1">));</span>
+                    <span class="s0">return </span><span class="s1">serial;</span>
+                <span class="s1">})</span>
+                <span class="s1">.collect(Collectors.toList());</span>
+
+        <span class="s1">goodsMovement.setSerialNumbers(serialNumberList);</span>
+
+
+
+        <span class="s1">output.setGoodsMovement(goodsMovement);</span>
+        <span class="s0">return </span><span class="s1">Mono.just(output)</span>
+                <span class="s1">.doOnSuccess(payload -&gt; log.debug(</span><span class="s2">&quot;payload() Apigee Request: -&gt; {}&quot;</span><span
+            class="s1">, JsonUtils.toJsonString(payload)));</span>
+    <span class="s1">}</span>
+<span class="s1">}</span>
+</pre>
+</body>
+</html>

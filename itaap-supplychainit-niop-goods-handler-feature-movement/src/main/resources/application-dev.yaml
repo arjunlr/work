@@ -1,0 +1,97 @@
+spring:
+  application:
+    name: itaap-supplychainit-niop-goods-handler
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      max-poll-records: 500
+      concurrency: 1
+      group-id: niopGoodsReceiptNotify
+      properties:
+        max:
+          poll:
+            interval:
+              ms: 600000
+        spring:
+          json:
+            use:
+              type:
+                headers: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: MANUAL
+    enable:
+      auto:
+        commit: false
+
+app:
+  env: ${APP_ENV:dev}
+  version: ${APP_VERSION:1.0.0}
+
+server:
+  port: 8082
+
+api:
+  niop-goods-handler: /goodsMovement
+
+#Kafka Configuration
+kafka:
+  topic:
+    read: supplychainit_goods_receipt_posting_dev
+  consumer:
+    concurrency: 1
+
+webclient:
+  connection:
+    timeout: ${WEBCLIENT_CONNECTION_TIMEOUT:10000}
+  memory-buffer-size: 524288
+  retry:
+    maxretry: 3
+    delay: 5
+  response:
+    timeout: 30
+
+niop:
+  token:
+    url: https://sap-gateway.dev1.amdservices.gobiocloud.com/api/sapgateway/authenticate
+    creds:
+      username: testdev
+      password: Test@123
+  reciept-url: https://sap-gateway.dev1.amdservices.gobiocloud.com/api/sapgateway/addnewdevices
+
+good-movement:
+  token:
+    url: https://login.microsoftonline.com/1a407a2d-7675-4d17-8692-b3ac285306e4/oauth2/v2.0/token
+    creds:
+      grant-type: client_credentials
+      client-id: 6bf7de7d-f3b9-4474-aa23-c64ce5620599
+      client-secret: tyx8Q~9CggP8NJOGrZ-o1LupBm2gYyX9uec21dlt
+      scope: api://philips-goods-movement-api-nonprod/.default
+  movement-url: https://dev.api.itaap.philips.com/philips-goods-movement-api/v1/goods-movement
+
+
+#Audit Configuration 
+audit:
+  connector:
+    url: http://localhost:8085/audit
+    username: audit
+    password: audit
+
+
+#service logging level
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com:
+      philips:
+        itaap: ${LOG_LEVEL_SERVICE:DEBUG}
+
+email:
+  url: https://acc.api.it.philips.com/philips-notification-handler-api/api/universal-email-alert
+  username: 434c0fd7f78544544726b04c3a742ccb
+  password: ea06fac51b06660d64d5af6aacfc3ef0
+  to: partner.divyam.dubey@philips.com
+  cc: partner.divyam.dubey@philips.com
+  subject: Error occured while processing goods receipt/movements (Local)
+  body: "<html><style>.tableCss{border: solid 10px solid #e5e5e5;border-collapse: collapse;}.tableCss th{background-color: purple !important;color: white !important;} .tableCss td{padding: 5px;text-align: left;border: 1px solid #ccc;}</style><body>Dear OPPORTUNITY_OWNER,<br><br>Your  attempt to create/update an opportunity in AWS has failed.<br>Please find the details described below.<br><br><table class='tableCss'><tr><th colspan='3'>Error Details</th></tr><tr><td>Salesforce Opportunity Golden Id</td><td>GOLDEN_ID</td></tr><tr><td>Error Message</td><td>ERROR_MESSAGE</td></tr></table><br><b>Note:</b><ul><li>Please review the error in Salesforce system and try again.</li><li>This is auto generated mail, please do not reply to this mail.</li></ul></body></html>"
